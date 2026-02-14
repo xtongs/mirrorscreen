@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build And Publish
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build (Release)
+        run: swift build -c release
+
+      - name: Locate Binary
+        id: locate
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN_PATH="$(find .build -type f -path '*/release/MirrorScreen' | head -n 1)"
+          if [[ -z "${BIN_PATH}" ]]; then
+            echo "MirrorScreen binary not found" >&2
+            exit 1
+          fi
+          echo "bin_path=${BIN_PATH}" >> "$GITHUB_OUTPUT"
+
+      - name: Package Assets
+        id: pkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME}"
+          mkdir -p dist
+
+          cp "${{ steps.locate.outputs.bin_path }}" "dist/MirrorScreen"
+          chmod +x "dist/MirrorScreen"
+
+          (cd dist && zip -q "MirrorScreen-${VERSION}-macos.zip" "MirrorScreen")
+
+          shasum -a 256 "dist/MirrorScreen-${VERSION}-macos.zip" > "dist/MirrorScreen-${VERSION}-macos.zip.sha256"
+
+          echo "zip_path=dist/MirrorScreen-${VERSION}-macos.zip" >> "$GITHUB_OUTPUT"
+          echo "sha_path=dist/MirrorScreen-${VERSION}-macos.zip.sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            ${{ steps.pkg.outputs.zip_path }}
+            ${{ steps.pkg.outputs.sha_path }}
