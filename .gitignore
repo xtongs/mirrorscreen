@@ -1,0 +1,4 @@
+.build/
+*.dSYM/
+MirrorScreen.log
+.DS_Store
