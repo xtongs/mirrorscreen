@@ -1,10 +1,11 @@
 #!/bin/bash
 # 启动 MirrorScreen launchd 常驻服务（推荐方式）
 
-BIN="/Users/clawrunner/Workspace/MirrorScreen/.build/arm64-apple-macosx/release/MirrorScreen"
+BIN_DIR="$(swift build -c release --show-bin-path 2>/dev/null)"
+BIN="$BIN_DIR/MirrorScreen"
 
-if [ ! -f "$BIN" ]; then
-    echo "错误: 二进制文件不存在"
+if [ -z "$BIN_DIR" ] || [ ! -f "$BIN" ]; then
+    echo "错误: 二进制文件不存在或构建失败"
     exit 1
 fi
 

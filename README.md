@@ -49,7 +49,8 @@ git clone <your-repo-url>
 cd MirrorScreen
 swift build -c release
 mkdir -p ~/.local/bin
-cp .build/arm64-apple-macosx/release/MirrorScreen ~/.local/bin/MirrorScreen
+BIN_DIR="$(swift build -c release --show-bin-path)"
+cp "$BIN_DIR/MirrorScreen" ~/.local/bin/MirrorScreen
 chmod +x ~/.local/bin/MirrorScreen
 ```
 
