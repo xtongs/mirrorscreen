@@ -2,6 +2,7 @@ import Foundation
 import CoreGraphics
 import CGVirtualDisplayBridge
 import Darwin
+import MachO
 
 // ─── 日志文件系统 ─────────────────────────────────────
 private var logFileHandle: FileHandle?
@@ -116,8 +117,37 @@ func runCommand(_ launchPath: String, _ arguments: [String]) -> (code: Int32, st
 }
 
 func resolvedExecutablePath() -> String {
-    let path = CommandLine.arguments[0]
-    return URL(fileURLWithPath: path).standardizedFileURL.path
+    // Ask dyld for the currently loaded executable path instead of trusting argv[0],
+    // which can be relative (e.g. "MirrorScreen") and tied to the caller's CWD.
+    var size: UInt32 = 0
+    _ = _NSGetExecutablePath(nil, &size)
+    if size > 0 {
+        var buffer = [CChar](repeating: 0, count: Int(size))
+        if _NSGetExecutablePath(&buffer, &size) == 0 {
+            let path = String(cString: buffer)
+            return URL(fileURLWithPath: path).resolvingSymlinksInPath().path
+        }
+    }
+
+    if let bundlePath = Bundle.main.executablePath, !bundlePath.isEmpty {
+        return URL(fileURLWithPath: bundlePath).resolvingSymlinksInPath().path
+    }
+
+    let arg0 = CommandLine.arguments[0]
+    if arg0.contains("/") {
+        return URL(fileURLWithPath: arg0).standardizedFileURL.resolvingSymlinksInPath().path
+    }
+
+    if let pathEnv = ProcessInfo.processInfo.environment["PATH"] {
+        for dir in pathEnv.split(separator: ":") {
+            let candidate = String(dir) + "/" + arg0
+            if access(candidate, X_OK) == 0 {
+                return URL(fileURLWithPath: candidate).resolvingSymlinksInPath().path
+            }
+        }
+    }
+
+    return URL(fileURLWithPath: arg0).standardizedFileURL.path
 }
 
 func guiUID() -> Int {
